@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import StatCard from "../components/StatCard";
 import SchemaCard from "../components/SchemaCard";
-import type { SchemaComplet, TypeBobinage, Marque } from "../lib/types";
+import type { SchemaComplet } from "../lib/types";
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);

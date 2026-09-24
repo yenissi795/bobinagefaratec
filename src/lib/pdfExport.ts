@@ -63,14 +63,6 @@ function getImageFormat(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
   return "PNG";
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 // ============================================================
 // PDF D'UN SCHEMA DE BOBINAGE

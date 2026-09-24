@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
-  ArrowLeft, Loader2, Trash2, Edit3, Zap, CircleDot, Cog,
+  ArrowLeft, Loader2, Trash2, Edit3, Zap, Cog,
   Wrench, FileDown
 } from "lucide-react";
 import type { SchemaComplet } from "../lib/types";

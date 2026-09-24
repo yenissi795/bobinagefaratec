@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
-  Save, X, Loader2, ArrowLeft, AlertCircle,
-  Zap, CircleDot, Cog, Wrench
+  Save, Loader2, ArrowLeft, AlertCircle,
+  Zap, Cog, Wrench
 } from "lucide-react";
 import PhotoUpload from "../components/PhotoUpload";
 import type { TypeBobinage, Marque } from "../lib/types";

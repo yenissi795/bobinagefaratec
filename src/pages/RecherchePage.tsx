@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+
 import { supabase } from "../lib/supabase";
-import { Search, Loader2, Zap, CircleDot, Cog, Filter, X } from "lucide-react";
+import { Search, Loader2, Zap, CircleDot, Cog, X } from "lucide-react";
 import SchemaCard from "../components/SchemaCard";
 import type { SchemaComplet, TypeBobinage, Marque } from "../lib/types";
 

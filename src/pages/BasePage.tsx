@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Plus, Loader2, Library, Search, Filter, X, Zap, CircleDot, Layers } from "lucide-react";
 import SchemaCard from "../components/SchemaCard";
@@ -14,6 +14,7 @@ const CATEGORIE_ICONS: Record<string, any> = {
 };
 
 export default function BasePage() {
+  const [searchParams] = useSearchParams();
   const [schemas, setSchemas] = useState<SchemaComplet[]>([]);
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [types, setTypes] = useState<TypeBobinage[]>([]);
@@ -21,7 +22,7 @@ export default function BasePage() {
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterCategorie, setFilterCategorie] = useState("");
+  const [filterCategorie, setFilterCategorie] = useState(searchParams.get("cat") || "");
   const [filterType, setFilterType] = useState("");
   const [filterMarque, setFilterMarque] = useState("");
   const [showFilters, setShowFilters] = useState(false);

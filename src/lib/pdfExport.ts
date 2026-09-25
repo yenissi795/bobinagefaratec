@@ -12,6 +12,13 @@ const COLORS = {
   darkRed: [192, 0, 0] as [number, number, number],
 };
 
+const CATEGORIE_LABELS: Record<string, string> = {
+  moteur: "MOTEUR ELECTRIQUE",
+  frein: "ELECTRO-FREIN",
+  transformateur: "TRANSFORMATEUR",
+  alternateur: "ALTERNATEUR",
+};
+
 function sanitize(text: string): string {
   return String(text)
     .replace(/→/g, "->")
@@ -41,7 +48,6 @@ async function loadLogoBase64(): Promise<string | null> {
   }
 }
 
-// Charge une image depuis une URL et la retourne en base64
 async function urlToBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url);
@@ -63,10 +69,54 @@ function getImageFormat(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
   return "PNG";
 }
 
+// Retourne les lignes de caracteristiques selon la categorie
+function buildCaracteristiques(schema: SchemaComplet): any[][] {
+  const rows: any[][] = [];
+  const addRow = (label1: string, val1: any, label2: string, val2: any) => {
+    rows.push([
+      { content: label1, styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
+      { content: val1 !== null && val1 !== undefined && val1 !== "" ? sanitize(String(val1)) : "—" },
+      { content: label2, styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
+      { content: val2 !== null && val2 !== undefined && val2 !== "" ? sanitize(String(val2)) : "—" },
+    ]);
+  };
 
-// ============================================================
-// PDF D'UN SCHEMA DE BOBINAGE
-// ============================================================
+  const cat = schema.categorie;
+
+  if (cat === "moteur") {
+    addRow("Puissance", schema.puissance_kw ? `${schema.puissance_kw} kW` : null, "Tension", schema.tension_v ? `${schema.tension_v} V` : null);
+    addRow("Courant nominal", schema.courant_nominal_a ? `${schema.courant_nominal_a} A` : null, "Nb poles", schema.nb_poles);
+    addRow("Vitesse", schema.vitesse_tr_min ? `${schema.vitesse_tr_min} tr/min` : null, "Frequence", schema.frequence ? `${schema.frequence} Hz` : null);
+    addRow("Technologie", schema.technologie, "Alimentation", schema.alimentation);
+    addRow("Connexion", schema.type_connexion, "Transfo", schema.type_transformateur);
+    addRow("Marque", schema.marque?.nom, "N° serie", schema.reference_moteur);
+  } else if (cat === "frein") {
+    addRow("Alimentation", schema.frein_alimentation, "Tension", schema.tension_v ? `${schema.tension_v} V` : null);
+    addRow("Courant", schema.courant_nominal_a ? `${schema.courant_nominal_a} A` : null, "Couple freinage", schema.frein_couple_nm ? `${schema.frein_couple_nm} Nm` : null);
+    addRow("Type de frein", schema.frein_type, "Puissance", schema.puissance_kw ? `${schema.puissance_kw} kW` : null);
+    addRow("Marque", schema.marque?.nom, "N° serie", schema.reference_moteur);
+  } else if (cat === "transformateur") {
+    addRow("Puissance", schema.puissance_kw ? `${schema.puissance_kw} kVA` : null, "Frequence", schema.frequence ? `${schema.frequence} Hz` : null);
+    addRow("Tension primaire", schema.tension_primaire_v ? `${schema.tension_primaire_v} V` : null, "Tension secondaire", schema.tension_secondaire_v ? `${schema.tension_secondaire_v} V` : null);
+    addRow("Courant primaire", schema.courant_primaire_a ? `${schema.courant_primaire_a} A` : null, "Courant secondaire", schema.courant_secondaire_a ? `${schema.courant_secondaire_a} A` : null);
+    addRow("Couplage", schema.couplage, "Nb phases", schema.nb_phases === 1 ? "Monophase" : schema.nb_phases === 3 ? "Triphase" : null);
+    addRow("Refroidissement", schema.refroidissement, "Marque", schema.marque?.nom);
+    addRow("N° serie", schema.reference_moteur, "", null);
+  } else if (cat === "alternateur") {
+    addRow("Puissance", schema.puissance_kw ? `${schema.puissance_kw} kVA` : null, "Tension", schema.tension_v ? `${schema.tension_v} V` : null);
+    addRow("Courant", schema.courant_nominal_a ? `${schema.courant_nominal_a} A` : null, "Nb poles", schema.nb_poles);
+    addRow("Vitesse", schema.vitesse_tr_min ? `${schema.vitesse_tr_min} tr/min` : null, "Frequence", schema.frequence ? `${schema.frequence} Hz` : null);
+    addRow("Alimentation", schema.alimentation, "Connexion", schema.type_connexion);
+    addRow("Excitation", schema.excitation, "Marque", schema.marque?.nom);
+    addRow("N° serie", schema.reference_moteur, "", null);
+  } else {
+    addRow("Puissance", schema.puissance_kw, "Tension", schema.tension_v);
+    addRow("Marque", schema.marque?.nom, "N° serie", schema.reference_moteur);
+  }
+
+  return rows;
+}
+
 export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -74,7 +124,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
 
   const logoBase64 = await loadLogoBase64();
 
-  // --- EN-TETE ---
+  // EN-TETE
   const headerHeight = 30;
   doc.setFillColor(...COLORS.dark);
   doc.rect(0, 0, pageWidth, headerHeight, "F");
@@ -88,12 +138,9 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
     try {
       doc.addImage(logoBase64, getImageFormat(logoBase64), 8, logoY, logoSize, logoSize);
       doc.addImage(logoBase64, getImageFormat(logoBase64), pageWidth - 8 - logoSize, logoY, logoSize, logoSize);
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
-  // Titre centre
   doc.setTextColor(...COLORS.white);
   doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
@@ -115,15 +162,13 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
 
   let cursorY = 38;
 
-  // --- PHOTO DU SCHEMA ---
+  // PHOTO
   if (schema.photo_url) {
     const imgBase64 = await urlToBase64(schema.photo_url);
     if (imgBase64) {
-      // Zone max pour l'image
       const maxImgWidth = pageWidth - 28;
       const maxImgHeight = 130;
 
-      // Charger l'image pour connaitre ses dimensions reelles
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const i = new Image();
         i.onload = () => resolve(i);
@@ -142,69 +187,48 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
 
       const imgX = (pageWidth - imgWidth) / 2;
 
-      // Cadre
       doc.setDrawColor(...COLORS.gray);
       doc.setLineWidth(0.3);
       doc.rect(imgX - 1, cursorY - 1, imgWidth + 2, imgHeight + 2);
 
       try {
         doc.addImage(imgBase64, getImageFormat(imgBase64), imgX, cursorY, imgWidth, imgHeight);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
 
       cursorY += imgHeight + 10;
     }
   }
 
-  // --- SECTION MOTEUR ---
+  // SECTION MOTEUR/FREIN/TRANSFO/ALTERNATEUR
   if (cursorY > pageHeight - 60) {
     doc.addPage();
     cursorY = 20;
   }
 
+  const catLabel = schema.categorie ? CATEGORIE_LABELS[schema.categorie] : "EQUIPEMENT";
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.darkRed);
-  doc.text("CARACTERISTIQUES DU MOTEUR", 14, cursorY);
+  doc.text(`CARACTERISTIQUES - ${catLabel}`, 14, cursorY);
   cursorY += 5;
 
   autoTable(doc, {
     startY: cursorY,
-    body: [
-      [
-        { content: "Puissance", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: schema.puissance_kw !== null ? `${schema.puissance_kw} kW` : "—" },
-        { content: "Tension", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: schema.tension_v !== null ? `${schema.tension_v} V` : "—" },
-      ],
-      [
-        { content: "Nb poles", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: schema.nb_poles !== null ? `${schema.nb_poles}` : "—" },
-        { content: "Vitesse", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: schema.vitesse_tr_min !== null ? `${schema.vitesse_tr_min} tr/min` : "—" },
-      ],
-      [
-        { content: "Frequence", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: schema.frequence !== null ? `${schema.frequence} Hz` : "—" },
-        { content: "Type", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: sanitize(schema.technologie || "—") },
-      ],
-      [
-        { content: "Marque", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: sanitize(schema.marque?.nom || "—") },
-        { content: "Reference", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: sanitize(schema.reference_moteur || "—") },
-      ],
-    ],
+    body: buildCaracteristiques(schema),
     theme: "grid",
-    styles: { fontSize: 9, cellPadding: 2.5, textColor: COLORS.dark, lineColor: [220, 220, 220], lineWidth: 0.1 },
+    styles: {
+      fontSize: 9,
+      cellPadding: 2.5,
+      textColor: COLORS.dark,
+      lineColor: [220, 220, 220],
+      lineWidth: 0.1,
+    },
     margin: { left: 14, right: 14 },
   });
 
   cursorY = (doc as any).lastAutoTable.finalY + 8;
 
-  // --- SECTION BOBINAGE ---
+  // SECTION BOBINAGE
   if (cursorY > pageHeight - 80) {
     doc.addPage();
     cursorY = 20;
@@ -216,12 +240,19 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   doc.text("CARACTERISTIQUES DU BOBINAGE", 14, cursorY);
   cursorY += 5;
 
+  const typeBobinageNom = schema.type_bobinage?.nom || schema.type_bobinage_libre || null;
+  const connexionLabel =
+    schema.connexion === "etoile" ? "Etoile (Y)" :
+    schema.connexion === "triangle" ? "Triangle" :
+    schema.connexion === "etoile-triangle" ? "Etoile-Triangle" :
+    schema.connexion;
+
   autoTable(doc, {
     startY: cursorY,
     body: [
       [
-        { content: "Type de bobinage", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: sanitize(schema.type_bobinage?.nom || "—") },
+        { content: "Type bobinage", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
+        { content: sanitize(typeBobinageNom || "—") },
         { content: "Nb encoches", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
         { content: schema.nb_encoches !== null ? `${schema.nb_encoches}` : "—" },
       ],
@@ -247,7 +278,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
         { content: "Groupes/phase", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
         { content: schema.groupes_par_phase !== null ? `${schema.groupes_par_phase}` : "—" },
         { content: "Connexion", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: schema.connexion === "etoile" ? "Etoile (Y)" : schema.connexion === "triangle" ? "Triangle" : sanitize(schema.connexion || "—") },
+        { content: sanitize(connexionLabel || "—") },
       ],
       [
         { content: "Nb voies", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
@@ -263,7 +294,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
 
   cursorY = (doc as any).lastAutoTable.finalY + 8;
 
-  // --- NOTES ---
+  // NOTES
   if (schema.notes && schema.notes.trim()) {
     if (cursorY > pageHeight - 50) {
       doc.addPage();
@@ -284,7 +315,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
     doc.text(splitNotes, 14, cursorY);
   }
 
-  // --- PIED DE PAGE ---
+  // PIED
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -300,9 +331,6 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   return doc;
 }
 
-// ============================================================
-// TELECHARGER LE PDF
-// ============================================================
 export async function downloadSchemaPdf(schema: SchemaComplet): Promise<void> {
   const doc = await buildSchemaPdf(schema);
   const filename = `FARATEC_${(schema.code_schema || "schema").replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;

@@ -50,9 +50,9 @@ export default function SchemaCard({ schema }: SchemaCardProps) {
           </span>
         </div>
 
-        {schema.type_bobinage && (
+        {(schema.type_bobinage?.nom || schema.type_bobinage_libre) && (
           <p className="text-xs text-slate-600 font-medium mb-2">
-            {schema.type_bobinage.nom}
+            {schema.type_bobinage?.nom || schema.type_bobinage_libre}
           </p>
         )}
 

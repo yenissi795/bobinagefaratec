@@ -32,7 +32,7 @@ export default function PhotoUpload({ currentUrl, onUploaded, onRemoved }: Photo
       const filePath = `schemas/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("schema-photos")
+        .from("schema-photo")
         .upload(filePath, compressedBlob, {
           contentType: "image/jpeg",
           upsert: false,
@@ -41,7 +41,7 @@ export default function PhotoUpload({ currentUrl, onUploaded, onRemoved }: Photo
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
-        .from("schema-photos")
+        .from("schema-photo")
         .getPublicUrl(filePath);
 
       setPreview(urlData.publicUrl);

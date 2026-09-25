@@ -1,17 +1,27 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { Plus, Loader2, Library, Search, Filter, X } from "lucide-react";
+import { Plus, Loader2, Library, Search, Filter, X, Zap, CircleDot, Layers } from "lucide-react";
 import SchemaCard from "../components/SchemaCard";
-import type { SchemaComplet, TypeBobinage, Marque } from "../lib/types";
+import type { SchemaComplet, Categorie, TypeBobinage, Marque } from "../lib/types";
+import { loadCategories } from "../lib/referentiels";
+
+const CATEGORIE_ICONS: Record<string, any> = {
+  moteur: Zap,
+  frein: CircleDot,
+  transformateur: Layers,
+  alternateur: Zap,
+};
 
 export default function BasePage() {
   const [schemas, setSchemas] = useState<SchemaComplet[]>([]);
+  const [categories, setCategories] = useState<Categorie[]>([]);
   const [types, setTypes] = useState<TypeBobinage[]>([]);
   const [marques, setMarques] = useState<Marque[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterCategorie, setFilterCategorie] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterMarque, setFilterMarque] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -19,16 +29,18 @@ export default function BasePage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [s, t, m] = await Promise.all([
+      const [s, cats, t, m] = await Promise.all([
         supabase
           .from("schemas_bobinage")
           .select("*, marque:marques(*), type_bobinage:types_bobinage(*)")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }),
+        loadCategories(),
         supabase.from("types_bobinage").select("*").order("nom"),
         supabase.from("marques").select("*").order("nom"),
       ]);
       setSchemas((s.data as unknown as SchemaComplet[]) || []);
+      setCategories(cats);
       setTypes((t.data as TypeBobinage[]) || []);
       setMarques((m.data as Marque[]) || []);
       setLoading(false);
@@ -38,6 +50,7 @@ export default function BasePage() {
 
   const filtered = useMemo(() => {
     return schemas.filter((s) => {
+      if (filterCategorie && s.categorie !== filterCategorie) return false;
       if (filterType && s.type_bobinage_id !== filterType) return false;
       if (filterMarque && s.marque_id !== filterMarque) return false;
       if (searchTerm) {
@@ -46,16 +59,18 @@ export default function BasePage() {
           (s.code_schema && s.code_schema.toLowerCase().includes(q)) ||
           (s.reference_moteur && s.reference_moteur.toLowerCase().includes(q)) ||
           (s.notes && s.notes.toLowerCase().includes(q)) ||
-          (s.type_moteur && s.type_moteur.toLowerCase().includes(q));
+          (s.technologie && s.technologie.toLowerCase().includes(q)) ||
+          (s.alimentation && s.alimentation.toLowerCase().includes(q));
         if (!match) return false;
       }
       return true;
     });
-  }, [schemas, filterType, filterMarque, searchTerm]);
+  }, [schemas, filterCategorie, filterType, filterMarque, searchTerm]);
 
-  const nbFiltresActifs = (filterType ? 1 : 0) + (filterMarque ? 1 : 0);
+  const nbFiltresActifs = (filterCategorie ? 1 : 0) + (filterType ? 1 : 0) + (filterMarque ? 1 : 0);
 
   const resetFilters = () => {
+    setFilterCategorie("");
     setFilterType("");
     setFilterMarque("");
     setSearchTerm("");
@@ -66,7 +81,7 @@ export default function BasePage() {
       {/* En-tête */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Library size={20} className="text-amber-600" />
             Base complète
           </h1>
@@ -80,6 +95,33 @@ export default function BasePage() {
         >
           <Plus size={14} /> Nouveau
         </Link>
+      </div>
+
+      {/* Boutons catégories */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setFilterCategorie("")}
+          className={`text-xs font-semibold rounded-lg px-3 py-1.5 transition ${
+            filterCategorie === "" ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          Toutes ({schemas.length})
+        </button>
+        {categories.map((cat) => {
+          const Icon = CATEGORIE_ICONS[cat.code] || Zap;
+          const count = schemas.filter((s) => s.categorie === cat.code).length;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setFilterCategorie(cat.code)}
+              className={`flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 transition ${
+                filterCategorie === cat.code ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <Icon size={12} /> {cat.nom} ({count})
+            </button>
+          );
+        })}
       </div>
 
       {/* Recherche + filtres */}
@@ -117,7 +159,7 @@ export default function BasePage() {
           <div className="pt-3 border-t border-slate-100 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">
+                <label className="text-xs font-semibold text-slate-900 block mb-1">
                   Type de bobinage
                 </label>
                 <select
@@ -132,7 +174,7 @@ export default function BasePage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">
+                <label className="text-xs font-semibold text-slate-900 block mb-1">
                   Marque
                 </label>
                 <select

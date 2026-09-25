@@ -1,16 +1,25 @@
 import { useEffect, useState, useMemo } from "react";
-
 import { supabase } from "../lib/supabase";
-import { Search, Loader2, Zap, CircleDot, Cog, X } from "lucide-react";
+import { Search, Loader2, Zap, CircleDot, Cog, Layers, X } from "lucide-react";
 import SchemaCard from "../components/SchemaCard";
-import type { SchemaComplet, TypeBobinage, Marque } from "../lib/types";
+import type { SchemaComplet, Categorie, TypeBobinage, Marque } from "../lib/types";
+import { loadCategories } from "../lib/referentiels";
+
+const CATEGORIE_ICONS: Record<string, any> = {
+  moteur: Zap,
+  frein: CircleDot,
+  transformateur: Layers,
+  alternateur: Zap,
+};
 
 export default function RecherchePage() {
   const [schemas, setSchemas] = useState<SchemaComplet[]>([]);
+  const [categories, setCategories] = useState<Categorie[]>([]);
   const [types, setTypes] = useState<TypeBobinage[]>([]);
   const [marques, setMarques] = useState<Marque[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [categorie, setCategorie] = useState("");
   const [puissance, setPuissance] = useState("");
   const [nbPoles, setNbPoles] = useState("");
   const [nbEncoches, setNbEncoches] = useState("");
@@ -21,16 +30,18 @@ export default function RecherchePage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [s, t, m] = await Promise.all([
+      const [s, cats, t, m] = await Promise.all([
         supabase
           .from("schemas_bobinage")
           .select("*, marque:marques(*), type_bobinage:types_bobinage(*)")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }),
+        loadCategories(),
         supabase.from("types_bobinage").select("*").order("nom"),
         supabase.from("marques").select("*").order("nom"),
       ]);
       setSchemas((s.data as unknown as SchemaComplet[]) || []);
+      setCategories(cats);
       setTypes((t.data as TypeBobinage[]) || []);
       setMarques((m.data as Marque[]) || []);
       setLoading(false);
@@ -40,6 +51,7 @@ export default function RecherchePage() {
 
   const filtered = useMemo(() => {
     return schemas.filter((s) => {
+      if (categorie && s.categorie !== categorie) return false;
       if (puissance && (s.puissance_kw === null || s.puissance_kw !== parseFloat(puissance))) return false;
       if (nbPoles && (s.nb_poles === null || s.nb_poles !== parseInt(nbPoles))) return false;
       if (nbEncoches && (s.nb_encoches === null || s.nb_encoches !== parseInt(nbEncoches))) return false;
@@ -55,9 +67,10 @@ export default function RecherchePage() {
       }
       return true;
     });
-  }, [schemas, puissance, nbPoles, nbEncoches, typeId, marqueId, searchTerm]);
+  }, [schemas, categorie, puissance, nbPoles, nbEncoches, typeId, marqueId, searchTerm]);
 
   const reset = () => {
+    setCategorie("");
     setPuissance("");
     setNbPoles("");
     setNbEncoches("");
@@ -66,13 +79,12 @@ export default function RecherchePage() {
     setSearchTerm("");
   };
 
-  const nbCriteres = [puissance, nbPoles, nbEncoches, typeId, marqueId, searchTerm].filter(Boolean).length;
+  const nbCriteres = [categorie, puissance, nbPoles, nbEncoches, typeId, marqueId, searchTerm].filter(Boolean).length;
 
   return (
     <div className="space-y-5">
-      {/* En-tête */}
       <div>
-        <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
           <Search size={20} className="text-amber-600" />
           Recherche avancée
         </h1>
@@ -81,12 +93,43 @@ export default function RecherchePage() {
         </p>
       </div>
 
-      {/* Critères de recherche */}
+      {/* Categories */}
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <label className="text-xs font-semibold text-slate-900 block mb-2">
+          Catégorie d'équipement
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setCategorie("")}
+            className={`text-xs font-semibold rounded-lg px-3 py-1.5 transition ${
+              categorie === "" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Toutes
+          </button>
+          {categories.map((cat) => {
+            const Icon = CATEGORIE_ICONS[cat.code] || Zap;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setCategorie(cat.code)}
+                className={`flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 transition ${
+                  categorie === cat.code ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <Icon size={12} /> {cat.nom}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Criteres */}
       <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
-              <Zap size={12} className="text-amber-600" /> Puissance (kW)
+            <label className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-1">
+              <Zap size={12} className="text-amber-600" /> Puissance (kW / kVA)
             </label>
             <input
               type="number"
@@ -98,7 +141,7 @@ export default function RecherchePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
+            <label className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-1">
               <CircleDot size={12} className="text-blue-600" /> Nombre de pôles
             </label>
             <input
@@ -110,7 +153,7 @@ export default function RecherchePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
+            <label className="text-xs font-semibold text-slate-900 mb-1 flex items-center gap-1">
               <Cog size={12} className="text-violet-600" /> Nombre d'encoches
             </label>
             <input
@@ -122,7 +165,7 @@ export default function RecherchePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1">Type de bobinage</label>
+            <label className="text-xs font-semibold text-slate-900 mb-1">Type de bobinage</label>
             <select
               value={typeId}
               onChange={(e) => setTypeId(e.target.value)}
@@ -133,7 +176,7 @@ export default function RecherchePage() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1">Marque</label>
+            <label className="text-xs font-semibold text-slate-900 mb-1">Marque</label>
             <select
               value={marqueId}
               onChange={(e) => setMarqueId(e.target.value)}
@@ -144,7 +187,7 @@ export default function RecherchePage() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1">Recherche texte</label>
+            <label className="text-xs font-semibold text-slate-900 mb-1">Recherche texte</label>
             <input
               type="text"
               value={searchTerm}
@@ -165,7 +208,7 @@ export default function RecherchePage() {
         )}
       </div>
 
-      {/* Résultats */}
+      {/* Resultats */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="animate-spin text-amber-500" size={28} />

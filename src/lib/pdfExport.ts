@@ -188,7 +188,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
         { content: "Frequence", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
         { content: schema.frequence !== null ? `${schema.frequence} Hz` : "—" },
         { content: "Type", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },
-        { content: sanitize(schema.type_moteur || "—") },
+        { content: sanitize(schema.technologie || "—") },
       ],
       [
         { content: "Marque", styles: { fontStyle: "bold", fillColor: COLORS.lightGray } },

@@ -22,9 +22,9 @@ export function formatDateTime(iso: string | null): string {
 // --- COMPRESSION D'IMAGE (retourne un Blob) ---
 export async function compresserImage(
   file: File,
-  maxWidth = 1600,
-  maxHeight = 1600,
-  quality = 0.8
+  maxWidth = 2400,
+  maxHeight = 2400,
+  quality = 0.92
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

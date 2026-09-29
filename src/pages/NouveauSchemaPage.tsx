@@ -26,6 +26,7 @@ const EMPTY_FORM = {
 
   // Moteur
   puissance_kw: "",
+  tension_v: "",
   vitesse_tr_min: "",
   courant_nominal_a: "",
   cos_phi: "",
@@ -170,6 +171,7 @@ export default function NouveauSchemaPage() {
       photo_url: form.photo_url || null,
       photo_2_url: form.photo_2_url || null,
       puissance_kw: num(form.puissance_kw),
+      tension_v: int(form.tension_v),
       vitesse_tr_min: int(form.vitesse_tr_min),
       courant_nominal_a: num(form.courant_nominal_a),
       cos_phi: num(form.cos_phi),
@@ -325,6 +327,7 @@ export default function NouveauSchemaPage() {
       <Section icon={Zap} title="Caractéristiques moteur">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Field label="Puissance (kW)" type="number" step="0.01" value={form.puissance_kw} onChange={(v) => update("puissance_kw", v)} placeholder="Ex: 500" />
+          <Field label="Tension (V)" type="number" value={form.tension_v} onChange={(v) => update("tension_v", v)} placeholder="Ex: 380" />
           <Field label="Vitesse (tr/min)" type="number" value={form.vitesse_tr_min} onChange={(v) => update("vitesse_tr_min", v)} placeholder="Ex: 595" />
           <Field label="Courant (A)" type="number" step="0.01" value={form.courant_nominal_a} onChange={(v) => update("courant_nominal_a", v)} placeholder="Ex: 63" />
           <Field label="Cos φ" type="number" step="0.01" value={form.cos_phi} onChange={(v) => update("cos_phi", v)} placeholder="Ex: 0.95" />

@@ -386,9 +386,9 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   y += tempsH + 3;
 
   // ============================================================
-  // PHOTOS (2)
+  // PHOTOS (2) - alignees verticalement, grandes
   // ============================================================
-  if (y > pageHeight - 90) {
+  if (y > pageHeight - 20) {
     doc.addPage();
     y = margin + 5;
   }
@@ -399,10 +399,16 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   doc.text("PHOTOS DU DOSSIER", margin, y);
   y += 4;
 
-  const photoW = (contentWidth - 4) / 2;
-  const photoH = 70;
+  const photoW = contentWidth;
+  const photoH = 120;
 
-  // Photo 1 : schema
+  // PHOTO 1 : SCHEMA
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.dark);
+  doc.text("Photo 1 : Schema de bobinage", margin, y + 3);
+  y += 5;
+
   doc.setDrawColor(...COLORS.borderRed);
   doc.setLineWidth(0.3);
   doc.rect(margin, y, photoW, photoH);
@@ -431,15 +437,24 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
     }
   }
 
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "italic");
-  doc.setTextColor(...COLORS.gray);
-  doc.text("Photo 1 : Schéma de bobinage", margin + 2, y + photoH + 3);
+  y += photoH + 8;
 
-  // Photo 2 : fiche
+  // Nouvelle page si necessaire
+  if (y > pageHeight - 130) {
+    doc.addPage();
+    y = margin + 5;
+  }
+
+  // PHOTO 2 : FICHE
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.dark);
+  doc.text("Photo 2 : Fiche remplie", margin, y + 3);
+  y += 5;
+
   doc.setDrawColor(...COLORS.borderRed);
   doc.setLineWidth(0.3);
-  doc.rect(margin + photoW + 4, y, photoW, photoH);
+  doc.rect(margin, y, photoW, photoH);
 
   if (schema.photo_2_url) {
     const imgBase64 = await urlToBase64(schema.photo_2_url);
@@ -458,17 +473,14 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
           ih = photoH - 2;
           iw = ih * ratio;
         }
-        const ix = margin + photoW + 4 + 1 + (photoW - 2 - iw) / 2;
+        const ix = margin + 1 + (photoW - 2 - iw) / 2;
         const iy = y + 1 + (photoH - 2 - ih) / 2;
         doc.addImage(imgBase64, getImageFormat(imgBase64), ix, iy, iw, ih);
       } catch (e) {}
     }
   }
 
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "italic");
-  doc.setTextColor(...COLORS.gray);
-  doc.text("Photo 2 : Fiche remplie", margin + photoW + 6, y + photoH + 3);
+  y += photoH + 8;
 
   // ============================================================
   // NOTES (si presentes)

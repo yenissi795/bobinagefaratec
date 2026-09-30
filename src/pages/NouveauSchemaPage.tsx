@@ -110,6 +110,7 @@ export default function NouveauSchemaPage() {
   const [marques, setMarques] = useState<Marque[]>([]);
   const [typesBobinage, setTypesBobinage] = useState<TypeBobinage[]>([]);
   const [showTypeBobinageLibre, setShowTypeBobinageLibre] = useState(false);
+  const [existingFiche, setExistingFiche] = useState<{ id: string; code_schema: string } | null>(null);
   const [showMarqueLibre, setShowMarqueLibre] = useState(false);
   const [marqueLibre, setMarqueLibre] = useState("");
 
@@ -128,6 +129,20 @@ export default function NouveauSchemaPage() {
     load();
   }, []);
 
+  const verifierCodeSchema = async (code: string) => {
+    if (!code.trim()) {
+      setExistingFiche(null);
+      return;
+    }
+    const { data } = await supabase
+      .from("schemas_bobinage")
+      .select("id, code_schema")
+      .eq("code_schema", code.trim())
+      .is("deleted_at", null)
+      .maybeSingle();
+    setExistingFiche(data as any);
+  };
+
   const update = (key: keyof typeof EMPTY_FORM, value: any) => {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => ({ ...e, [key]: "" }));
@@ -136,6 +151,7 @@ export default function NouveauSchemaPage() {
   const handleSave = async () => {
     const errs: Record<string, string> = {};
     if (!form.code_schema.trim()) errs.code_schema = "Le N° Faratec est obligatoire";
+    if (existingFiche) errs.code_schema = "Ce numero existe deja. Ouvrez la fiche ou changez de numero.";
     if (!form.photo_url) errs.photo_url = "La photo du schéma est obligatoire";
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
@@ -297,8 +313,38 @@ export default function NouveauSchemaPage() {
       {/* SECTION 2 : EN-TETE FICHE */}
       <Section icon={Hash} title="En-tête de la fiche">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Field label="N° Faratec *" value={form.code_schema} onChange={(v) => update("code_schema", v)} placeholder="Ex: 13784" />
-          {errors.code_schema && <p className="text-xs text-red-600 mt-1">{errors.code_schema}</p>}
+          <div>
+            <Field
+              label="N° Faratec *"
+              value={form.code_schema}
+              onChange={(v) => {
+                update("code_schema", v);
+                verifierCodeSchema(v);
+              }}
+              placeholder="Ex: 13784"
+            />
+            {errors.code_schema && <p className="text-xs text-red-600 mt-1">{errors.code_schema}</p>}
+            {existingFiche && (
+              <div className="mt-2 bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-amber-900">
+                    La fiche N° {existingFiche.code_schema} existe deja
+                  </p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Vous pouvez l'ouvrir pour la modifier, ou saisir un autre numero.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/schema/${existingFiche.id}`)}
+                    className="mt-2 inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-neutral-900 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition"
+                  >
+                    Ouvrir la fiche existante
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <Field label="Date" type="date" value={form.date_fiche} onChange={(v) => update("date_fiche", v)} />
           <SelectField
             label="Catégorie"

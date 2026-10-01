@@ -61,6 +61,7 @@ async function urlToBase64(url: string): Promise<string | null> {
 function getImageFormat(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
   if (dataUrl.includes("image/png")) return "PNG";
   if (dataUrl.includes("image/jpeg") || dataUrl.includes("image/jpg")) return "JPEG";
+  if (dataUrl.includes("image/webp")) return "WEBP";
   return "PNG";
 }
 
@@ -68,6 +69,59 @@ const v = (val: any, suffix = ""): string => {
   if (val === null || val === undefined || val === "") return "";
   return sanitize(String(val)) + suffix;
 };
+
+// ============================================================
+// PAGE PHOTO : une photo = une page entiere
+// ============================================================
+async function drawPhotoPage(
+  doc: jsPDF,
+  titre: string,
+  imgBase64: string
+): Promise<void> {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 10;
+  const footerReserve = 12; // place pour le pied de page
+
+  // Titre de la photo
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.darkRed);
+  doc.text(sanitize(titre), margin, margin + 4);
+
+  // Cadre qui occupe toute la page
+  const frameX = margin;
+  const frameY = margin + 8;
+  const frameW = pageWidth - margin * 2;
+  const frameH = pageHeight - frameY - footerReserve;
+
+  doc.setDrawColor(...COLORS.borderRed);
+  doc.setLineWidth(0.3);
+  doc.rect(frameX, frameY, frameW, frameH);
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = imgBase64;
+    });
+
+    // Adapter l'image au cadre sans la deformer ni la couper
+    const ratio = img.width / img.height;
+    let iw = frameW - 2;
+    let ih = iw / ratio;
+    if (ih > frameH - 2) {
+      ih = frameH - 2;
+      iw = ih * ratio;
+    }
+    const ix = frameX + 1 + (frameW - 2 - iw) / 2;
+    const iy = frameY + 1 + (frameH - 2 - ih) / 2;
+    doc.addImage(imgBase64, getImageFormat(imgBase64), ix, iy, iw, ih);
+  } catch (e) {
+    // image illisible : le cadre reste vide
+  }
+}
 
 export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -77,6 +131,28 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   const logoBase64 = await loadLogoBase64();
   const margin = 10;
   const contentWidth = pageWidth - margin * 2;
+
+  // ============================================================
+  // PAGES 1 et 2 : PHOTOS (une par page)
+  // ============================================================
+  const photos: { titre: string; url?: string | null }[] = [
+    { titre: "Photo 1 : Schema de bobinage", url: schema.photo_url },
+    { titre: "Photo 2 : Fiche remplie", url: schema.photo_2_url },
+  ];
+
+  let photoPagesCount = 0;
+  for (const p of photos) {
+    if (!p.url) continue;
+    const imgBase64 = await urlToBase64(p.url);
+    if (!imgBase64) continue;
+
+    if (photoPagesCount > 0) doc.addPage();
+    await drawPhotoPage(doc, p.titre, imgBase64);
+    photoPagesCount++;
+  }
+
+  // La fiche technique est toujours la DERNIERE page
+  if (photoPagesCount > 0) doc.addPage();
 
   let y = margin;
 
@@ -114,7 +190,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   doc.rect(pageWidth - margin - 40, y + 7, 40, 8);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(`N° ${sanitize(schema.code_schema || "—")}`, pageWidth - margin - 38, y + 12);
+  doc.text(`N° ${sanitize(schema.code_schema || "-")}`, pageWidth - margin - 38, y + 12);
 
   y += headerH;
 
@@ -164,7 +240,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   doc.text(sanitize(schema.num_serie || ""), margin + 62, y + 11);
   doc.text(sanitize(schema.type_moteur || ""), margin + 110, y + 11);
 
-  // Ligne Puissance / Vitesse / Courant / Cos φ / Rotor
+  // Ligne Puissance / Vitesse / Courant / Cos phi / Rotor
   doc.setDrawColor(...COLORS.borderRed);
   doc.line(margin, y + 13, pageWidth - margin, y + 13);
 
@@ -174,7 +250,8 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   doc.text(`P: ${v(schema.puissance_kw, " kW")}`, margin + 2, y + 18);
   doc.text(`V: ${v(schema.vitesse_tr_min, " t/min")}`, margin + 45, y + 18);
   doc.text(`A: ${v(schema.courant_nominal_a, " A")}`, margin + 85, y + 18);
-  doc.text(`Cos φ: ${v(schema.cos_phi)}`, margin + 120, y + 18);
+  // "φ" n'existe pas dans la police Helvetica de jsPDF (il s'affichait "Æ")
+  doc.text(`Cos phi: ${v(schema.cos_phi)}`, margin + 120, y + 18);
   doc.text(`Rotor: ${v(schema.rotor)}`, margin + 150, y + 18);
 
   y += clientH + 2;
@@ -386,108 +463,10 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
   y += tempsH + 3;
 
   // ============================================================
-  // PHOTOS (2) - alignees verticalement, grandes
-  // ============================================================
-  if (y > pageHeight - 20) {
-    doc.addPage();
-    y = margin + 5;
-  }
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.darkRed);
-  doc.text("PHOTOS DU DOSSIER", margin, y);
-  y += 4;
-
-  const photoW = contentWidth;
-  const photoH = 120;
-
-  // PHOTO 1 : SCHEMA
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.dark);
-  doc.text("Photo 1 : Schema de bobinage", margin, y + 3);
-  y += 5;
-
-  doc.setDrawColor(...COLORS.borderRed);
-  doc.setLineWidth(0.3);
-  doc.rect(margin, y, photoW, photoH);
-
-  if (schema.photo_url) {
-    const imgBase64 = await urlToBase64(schema.photo_url);
-    if (imgBase64) {
-      try {
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const i = new Image();
-          i.onload = () => resolve(i);
-          i.onerror = reject;
-          i.src = imgBase64;
-        });
-        const ratio = img.width / img.height;
-        let iw = photoW - 2;
-        let ih = iw / ratio;
-        if (ih > photoH - 2) {
-          ih = photoH - 2;
-          iw = ih * ratio;
-        }
-        const ix = margin + 1 + (photoW - 2 - iw) / 2;
-        const iy = y + 1 + (photoH - 2 - ih) / 2;
-        doc.addImage(imgBase64, getImageFormat(imgBase64), ix, iy, iw, ih);
-      } catch (e) {}
-    }
-  }
-
-  y += photoH + 8;
-
-  // Nouvelle page si necessaire
-  if (y > pageHeight - 130) {
-    doc.addPage();
-    y = margin + 5;
-  }
-
-  // PHOTO 2 : FICHE
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.dark);
-  doc.text("Photo 2 : Fiche remplie", margin, y + 3);
-  y += 5;
-
-  doc.setDrawColor(...COLORS.borderRed);
-  doc.setLineWidth(0.3);
-  doc.rect(margin, y, photoW, photoH);
-
-  if (schema.photo_2_url) {
-    const imgBase64 = await urlToBase64(schema.photo_2_url);
-    if (imgBase64) {
-      try {
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const i = new Image();
-          i.onload = () => resolve(i);
-          i.onerror = reject;
-          i.src = imgBase64;
-        });
-        const ratio = img.width / img.height;
-        let iw = photoW - 2;
-        let ih = iw / ratio;
-        if (ih > photoH - 2) {
-          ih = photoH - 2;
-          iw = ih * ratio;
-        }
-        const ix = margin + 1 + (photoW - 2 - iw) / 2;
-        const iy = y + 1 + (photoH - 2 - ih) / 2;
-        doc.addImage(imgBase64, getImageFormat(imgBase64), ix, iy, iw, ih);
-      } catch (e) {}
-    }
-  }
-
-  y += photoH + 8;
-
-  // ============================================================
-  // NOTES (si presentes)
+  // NOTES (si presentes) - sur la page de la fiche
   // ============================================================
   if (schema.notes && schema.notes.trim()) {
-    y += photoH + 8;
-    if (y > pageHeight - 20) {
+    if (y > pageHeight - 30) {
       doc.addPage();
       y = margin + 5;
     }
@@ -513,6 +492,7 @@ export async function buildSchemaPdf(schema: SchemaComplet): Promise<jsPDF> {
     doc.setLineWidth(0.3);
     doc.line(margin, pageHeight - 8, pageWidth - margin, pageHeight - 8);
     doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.gray);
     doc.text("FARATEC - Fiche technique de bobinage", margin, pageHeight - 4);
     doc.text(`Page ${i} / ${totalPages}`, pageWidth - margin, pageHeight - 4, { align: "right" });
